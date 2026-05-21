@@ -8,8 +8,6 @@ const GTD_TYPES = [
   "プロジェクト",
   "温めるアイデア",
   "Today's 進行中",
-  "Today's 完了",
-  "アーカイブ",
 ] as const;
 
 type GtdType = (typeof GTD_TYPES)[number];
@@ -95,17 +93,6 @@ export default function Page() {
         </div>
       )}
 
-      <textarea
-        ref={textareaRef}
-        // eslint-disable-next-line jsx-a11y/no-autofocus
-        autoFocus
-        value={task}
-        onChange={(e) => setTask(e.target.value)}
-        placeholder="思いついたタスクを入力..."
-        rows={3}
-        className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-200 text-base leading-relaxed"
-      />
-
       <div className="flex flex-wrap gap-2">
         {GTD_TYPES.map((type) => {
           const selected = type === gtdType;
@@ -125,6 +112,17 @@ export default function Page() {
           );
         })}
       </div>
+
+      <textarea
+        ref={textareaRef}
+        // eslint-disable-next-line jsx-a11y/no-autofocus
+        autoFocus
+        value={task}
+        onChange={(e) => setTask(e.target.value)}
+        placeholder="思いついたタスクを入力..."
+        rows={3}
+        className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-200 text-base leading-relaxed"
+      />
 
       <button
         type="button"

@@ -14,8 +14,6 @@ const ALLOWED_GTD = new Set([
   "プロジェクト",
   "温めるアイデア",
   "Today's 進行中",
-  "Today's 完了",
-  "アーカイブ",
 ]);
 
 export async function POST(request: Request) {

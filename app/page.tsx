@@ -64,7 +64,7 @@ export default function Page() {
         throw new Error(body?.error || `保存に失敗しました (${res.status})`);
       }
 
-      showToast({ kind: "success", message: "✓ Trayに追加しました" }, 1500);
+      showToast({ kind: "success", message: "✓ Trayに追加しました" });
     } catch (err) {
       setTask(submittedTask);
       setGtdType(submittedGtd);
@@ -118,7 +118,10 @@ export default function Page() {
         // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus
         value={task}
-        onChange={(e) => setTask(e.target.value)}
+        onChange={(e) => {
+          setTask(e.target.value);
+          if (toast) setToast(null);
+        }}
         placeholder="思いついたタスクを入力..."
         rows={3}
         className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-200 text-base leading-relaxed"

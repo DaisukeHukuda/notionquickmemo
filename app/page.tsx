@@ -79,20 +79,6 @@ export default function Page() {
 
   return (
     <main className="min-h-screen w-full px-4 py-6 flex flex-col gap-4 max-w-xl mx-auto">
-      {toast && (
-        <div
-          role="status"
-          className={`fixed left-1/2 -translate-x-1/2 top-4 z-50 px-4 py-2 rounded-lg shadow-md text-sm ${
-            toast.kind === "success"
-              ? "bg-emerald-600 text-white"
-              : "bg-red-600 text-white"
-          }`}
-          onClick={() => toast.kind === "error" && setToast(null)}
-        >
-          {toast.message}
-        </div>
-      )}
-
       <div className="flex flex-wrap gap-2">
         {GTD_TYPES.map((type) => {
           const selected = type === gtdType;
@@ -139,6 +125,20 @@ export default function Page() {
       >
         {saving ? "保存中..." : "保存"}
       </button>
+
+      {toast && (
+        <div
+          role="status"
+          className={`self-start rounded-lg px-3 py-2 text-sm ${
+            toast.kind === "success"
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              : "bg-red-50 text-red-700 border border-red-200"
+          }`}
+          onClick={() => toast.kind === "error" && setToast(null)}
+        >
+          {toast.message}
+        </div>
+      )}
     </main>
   );
 }

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "notion-quick-memo",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "/Users/daisukefukuda/Downloads/notion-quick-memo",
+      "port": 3000
+    }
+  ]
+}

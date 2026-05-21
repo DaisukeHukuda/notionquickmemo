@@ -125,7 +125,7 @@ export default function Page() {
           placeholder={
             toast?.kind === "success" ? "" : "思いついたタスクを入力..."
           }
-          rows={3}
+          rows={6}
           className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-200 text-base leading-relaxed"
         />
         {toast?.kind === "success" && (

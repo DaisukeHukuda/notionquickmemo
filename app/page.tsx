@@ -99,19 +99,45 @@ export default function Page() {
         })}
       </div>
 
-      <textarea
-        ref={textareaRef}
-        // eslint-disable-next-line jsx-a11y/no-autofocus
-        autoFocus
-        value={task}
-        onChange={(e) => {
-          setTask(e.target.value);
-          if (toast) setToast(null);
-        }}
-        placeholder="思いついたタスクを入力..."
-        rows={3}
-        className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-200 text-base leading-relaxed"
-      />
+      {toast?.kind === "error" && (
+        <div
+          role="alert"
+          onClick={() => setToast(null)}
+          className="rounded-lg px-3 py-2 text-sm bg-red-50 text-red-700 border border-red-200"
+        >
+          {toast.message}
+        </div>
+      )}
+
+      <div className="relative w-full">
+        <textarea
+          ref={textareaRef}
+          // eslint-disable-next-line jsx-a11y/no-autofocus
+          autoFocus
+          value={task}
+          onChange={(e) => {
+            setTask(e.target.value);
+            if (toast) setToast(null);
+          }}
+          onClick={() => {
+            if (toast?.kind === "success") setToast(null);
+          }}
+          placeholder={
+            toast?.kind === "success" ? "" : "思いついたタスクを入力..."
+          }
+          rows={3}
+          className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-200 text-base leading-relaxed"
+        />
+        {toast?.kind === "success" && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-none absolute left-4 top-3 right-4 text-base text-emerald-700 font-medium"
+          >
+            {toast.message}
+          </div>
+        )}
+      </div>
 
       <button
         type="button"
@@ -125,20 +151,6 @@ export default function Page() {
       >
         {saving ? "保存中..." : "保存"}
       </button>
-
-      {toast && (
-        <div
-          role="status"
-          className={`self-start rounded-lg px-3 py-2 text-sm ${
-            toast.kind === "success"
-              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
-          onClick={() => toast.kind === "error" && setToast(null)}
-        >
-          {toast.message}
-        </div>
-      )}
     </main>
   );
 }

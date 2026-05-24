@@ -1,4 +1,4 @@
-# Quick Notion Memo
+# Notion Quick Memo
 
 スマホのホーム画面から1タップで起動し、NotionのTrayデータベースに新規タスクを追加するだけの、自分専用Webアプリ（Phase 0）。
 
@@ -70,7 +70,7 @@ NOTION_DATABASE_ID=...
 万が一トークンが漏洩した場合は、すぐに以下の手順で再発行します。
 
 1. https://www.notion.so/profile/integrations にアクセス
-2. 該当のインテグレーション（例: `Quick Notion Memo`）を選択
+2. 該当のインテグレーション（例: `Notion Quick Memo`）を選択
 3. 「管理」→「シークレットを再生成」（または "Regenerate token"）を実行
 4. 新しいトークンをコピー
 5. Vercelダッシュボード → 該当プロジェクト → **Settings → Environment Variables** で `NOTION_TOKEN` を新しい値に更新

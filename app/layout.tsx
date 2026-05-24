@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "QuickMemo",
+    title: "NotionQuickMemo",
     statusBarStyle: "default",
   },
   icons: {

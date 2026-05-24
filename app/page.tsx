@@ -83,14 +83,14 @@ export default function Page() {
       <header className="flex items-center gap-3">
         <Image
           src="/icon-192.png"
-          alt="Quick Notion Memo logo"
+          alt="Notion Quick Memo logo"
           width={36}
           height={36}
           className="rounded-lg"
           priority
         />
         <h1 className="text-lg font-semibold text-gray-900">
-          Quick Notion Memo
+          Notion Quick Memo
         </h1>
       </header>
 

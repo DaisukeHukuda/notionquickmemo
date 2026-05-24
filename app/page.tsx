@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 const GTD_TYPES = [
@@ -79,6 +80,20 @@ export default function Page() {
 
   return (
     <main className="min-h-screen w-full px-4 py-6 flex flex-col gap-4 max-w-xl mx-auto">
+      <header className="flex items-center gap-3">
+        <Image
+          src="/icon-192.png"
+          alt="Quick Notion Memo logo"
+          width={36}
+          height={36}
+          className="rounded-lg"
+          priority
+        />
+        <h1 className="text-lg font-semibold text-gray-900">
+          Quick Notion Memo
+        </h1>
+      </header>
+
       <div className="flex flex-wrap gap-2">
         {GTD_TYPES.map((type) => {
           const selected = type === gtdType;

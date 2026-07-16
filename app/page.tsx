@@ -8,6 +8,12 @@ type Phase = "idle" | "saved" | "error";
 
 const SAVED_REVERT_MS = 2400;
 
+// プル更新: 減衰後の引っ張り距離がこの値を超えたらリロード
+const PULL_THRESHOLD = 54;
+const PULL_MAX = 90;
+const PULL_DAMPING = 0.4;
+const PULL_START_SLACK = 8;
+
 export default function Page() {
   const [dbKey, setDbKey] = useState<string>(DATABASES[0].key);
   const [task, setTask] = useState("");
@@ -22,7 +28,76 @@ export default function Page() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const revertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // プル更新
+  const mainRef = useRef<HTMLElement>(null);
+  const [pull, setPull] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const pullRef = useRef(0);
+  const refreshingRef = useRef(false);
+
   const db = getDb(dbKey) ?? DATABASES[0];
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+
+    let startY = 0;
+    let eligible = false;
+    let active = false;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (refreshingRef.current) return;
+      startY = e.touches[0].clientY;
+      // textarea内部がスクロール済みのときは通常スクロールを優先
+      const ta = textareaRef.current;
+      const insideTextarea =
+        ta && e.target instanceof Node && ta.contains(e.target);
+      eligible = !insideTextarea || (ta?.scrollTop ?? 0) <= 0;
+      active = false;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!eligible || refreshingRef.current) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy > PULL_START_SLACK) {
+        active = true;
+        const dist = Math.min((dy - PULL_START_SLACK) * PULL_DAMPING, PULL_MAX);
+        pullRef.current = dist;
+        setPull(dist);
+        setDragging(true);
+        if (e.cancelable) e.preventDefault();
+      } else if (active) {
+        pullRef.current = 0;
+        setPull(0);
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (!active) return;
+      active = false;
+      setDragging(false);
+      if (pullRef.current >= PULL_THRESHOLD) {
+        refreshingRef.current = true;
+        setRefreshing(true);
+        window.location.reload();
+      } else {
+        pullRef.current = 0;
+        setPull(0);
+      }
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -107,8 +182,77 @@ export default function Page() {
   const saved = phase === "saved";
   const disabled = saved || !canSave;
 
+  const pastThreshold = pull >= PULL_THRESHOLD;
+
   return (
-    <main className="h-dvh w-full max-w-xl mx-auto px-5 pt-3 pb-[max(10px,env(safe-area-inset-bottom))] flex flex-col box-border">
+    <main
+      ref={mainRef}
+      className="relative overflow-hidden h-dvh w-full max-w-xl mx-auto box-border"
+    >
+      {/* プル更新インジケーター */}
+      <div
+        aria-hidden={pull === 0 && !refreshing}
+        className="pointer-events-none absolute left-1/2 -translate-x-1/2 z-10 w-[34px] h-[34px] rounded-full flex items-center justify-center bg-white border border-[#E3E2E0] shadow-sm dark:bg-[#252525] dark:border-[#373737]"
+        style={{
+          top: pull - 42,
+          opacity: refreshing ? 1 : Math.min(pull / PULL_THRESHOLD, 1),
+          transition: dragging
+            ? "none"
+            : "top 0.2s ease, opacity 0.2s ease",
+        }}
+      >
+        {refreshing ? (
+          <svg
+            className="animate-spin"
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+          >
+            <circle
+              cx="8"
+              cy="8"
+              r="6"
+              fill="none"
+              strokeWidth="2"
+              className="stroke-[#E3E2E0] dark:stroke-[#373737]"
+            />
+            <path
+              d="M8 2a6 6 0 0 1 6 6"
+              fill="none"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="stroke-[#787774] dark:stroke-[#9B9B9B]"
+            />
+          </svg>
+        ) : (
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            style={{
+              transform: pastThreshold ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.15s ease",
+            }}
+          >
+            <path
+              d="M7 1.5v11M2.5 8L7 12.5 11.5 8"
+              fill="none"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="stroke-[#787774] dark:stroke-[#9B9B9B]"
+            />
+          </svg>
+        )}
+      </div>
+
+      <div
+        className="h-full flex flex-col px-5 pt-3 pb-[max(10px,env(safe-area-inset-bottom))] box-border"
+        style={{
+          transform: `translateY(${pull}px)`,
+          transition: dragging ? "none" : "transform 0.2s ease",
+        }}
+      >
       {/* ヘッダー */}
       <header className="flex items-center gap-[11px] pt-2 pb-4">
         <Image
@@ -241,6 +385,7 @@ export default function Page() {
         >
           {saved ? `✓ ${savedDbName}に追加しました` : "保存する"}
         </button>
+      </div>
       </div>
     </main>
   );

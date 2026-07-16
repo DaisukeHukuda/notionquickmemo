@@ -38,9 +38,15 @@ export async function POST(request: Request) {
   }
 
   // Build properties starting with the title field.
+  // 末尾の「（Q）」はこのアプリ経由で追加された印。
+  // 手入力で（Q）/(Q)が既に付いている場合は二重にならないよう剥がしてから付け直す。
+  const baseTask = task.replace(/\s*[（(]Q[)）]$/, "").trimEnd() || task;
   const properties: Record<string, unknown> = {
     [db.titleProp]: {
-      title: [{ text: { content: task } }],
+      title: [
+        { text: { content: baseTask } },
+        { text: { content: "（Q）" }, annotations: { bold: true } },
+      ],
     },
   };
 

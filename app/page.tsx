@@ -4,10 +4,9 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { DATABASES, getDb } from "@/lib/databases";
 
-type Toast =
-  | { kind: "success"; message: string }
-  | { kind: "error"; message: string }
-  | null;
+type Phase = "idle" | "saved" | "error";
+
+const SAVED_REVERT_MS = 2400;
 
 export default function Page() {
   const [dbKey, setDbKey] = useState<string>(DATABASES[0].key);
@@ -17,13 +16,21 @@ export default function Page() {
     return c?.type === "status" ? c.default : "";
   });
   const [multiSelectValue, setMultiSelectValue] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<Toast>(null);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [savedDbName, setSavedDbName] = useState("");
+  const [errDetail, setErrDetail] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const revertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const db = getDb(dbKey) ?? DATABASES[0];
 
-  // When the DB changes, reset the classifier state to that DB's defaults.
+  useEffect(() => {
+    return () => {
+      if (revertTimerRef.current) clearTimeout(revertTimerRef.current);
+    };
+  }, []);
+
+  // DB切替時は分類の選択状態をそのDBのデフォルトへ戻す
   useEffect(() => {
     if (db.classifier?.type === "status") {
       setStatusValue(db.classifier.default);
@@ -33,9 +40,14 @@ export default function Page() {
     setMultiSelectValue([]);
   }, [db]);
 
+  const revertToIdle = () => {
+    if (revertTimerRef.current) clearTimeout(revertTimerRef.current);
+    setPhase("idle");
+  };
+
   const handleSave = async () => {
     const trimmed = task.trim();
-    if (!trimmed || saving) return;
+    if (!trimmed || phase === "saved") return;
 
     const submittedTask = trimmed;
     const submittedDb = db;
@@ -49,13 +61,20 @@ export default function Page() {
       classifierPayload = submittedMulti;
     }
 
-    setSaving(true);
+    // 楽観的UI: 押した瞬間に入力をリセットし、ボタンを✓表示にモーフ
     setTask("");
     if (submittedDb.classifier?.type === "status") {
       setStatusValue(submittedDb.classifier.default);
     }
     setMultiSelectValue([]);
+    setSavedDbName(submittedDb.name);
+    setPhase("saved");
     textareaRef.current?.focus();
+
+    if (revertTimerRef.current) clearTimeout(revertTimerRef.current);
+    revertTimerRef.current = setTimeout(() => {
+      setPhase((p) => (p === "saved" ? "idle" : p));
+    }, SAVED_REVERT_MS);
 
     try {
       const res = await fetch("/api/memo", {
@@ -70,39 +89,28 @@ export default function Page() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || `保存に失敗しました (${res.status})`);
+        throw new Error(body?.error || `HTTP ${res.status}`);
       }
-
-      setToast({
-        kind: "success",
-        message: `✓ ${submittedDb.name}に追加しました`,
-      });
     } catch (err) {
+      if (revertTimerRef.current) clearTimeout(revertTimerRef.current);
       setTask(submittedTask);
       if (submittedDb.classifier?.type === "status") {
         setStatusValue(submittedStatus);
       }
       setMultiSelectValue(submittedMulti);
-      const message =
-        err instanceof Error ? err.message : "保存に失敗しました";
-      setToast({ kind: "error", message });
-    } finally {
-      setSaving(false);
+      setErrDetail(err instanceof Error ? err.message : "");
+      setPhase("error");
     }
   };
 
-  const disabled = saving || task.trim().length === 0;
-
-  const pillClass = (selected: boolean) =>
-    `px-3 py-2 rounded-full text-sm border transition ${
-      selected
-        ? "bg-gray-900 text-white border-gray-900"
-        : "bg-white text-gray-800 border-gray-300 hover:border-gray-500"
-    }`;
+  const canSave = task.trim().length > 0;
+  const saved = phase === "saved";
+  const disabled = saved || !canSave;
 
   return (
-    <main className="min-h-screen w-full px-4 py-6 flex flex-col gap-4 max-w-xl mx-auto">
-      <header className="flex items-center gap-3">
+    <main className="h-dvh w-full max-w-xl mx-auto px-5 pt-3 pb-[max(10px,env(safe-area-inset-bottom))] flex flex-col box-border">
+      {/* ヘッダー */}
+      <header className="flex items-center gap-[11px] pt-2 pb-4">
         <Image
           src="/icon-192.png"
           alt="Notion Quick Memo logo"
@@ -111,83 +119,95 @@ export default function Page() {
           className="rounded-lg"
           priority
         />
-        <h1 className="text-lg font-semibold text-gray-900">
+        <h1 className="text-base font-semibold tracking-[-0.01em] text-[#1F1F1F] dark:text-[#D4D4D4]">
           Notion Quick Memo
         </h1>
       </header>
 
-      {/* DB selector tabs */}
-      <div className="flex flex-wrap gap-2">
-        {DATABASES.map((d) => {
-          const selected = d.key === dbKey;
-          return (
-            <button
-              key={d.key}
-              type="button"
-              onClick={() => setDbKey(d.key)}
-              className={`px-3 py-2 rounded-md text-sm font-medium border transition ${
-                selected
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-gray-500"
-              }`}
-            >
-              {d.name}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Classifier UI (depends on selected DB) */}
-      {db.classifier?.type === "status" && (
-        <div className="flex flex-wrap gap-2">
-          {db.classifier.options.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => setStatusValue(opt)}
-              className={pillClass(opt === statusValue)}
-            >
-              {opt}
-            </button>
-          ))}
+      {/* 保存先タブ */}
+      <div className="flex flex-col gap-[7px]">
+        <div className="text-[11px] font-semibold tracking-[0.06em] text-[#787774] dark:text-[#9B9B9B]">
+          保存先
         </div>
-      )}
-
-      {db.classifier?.type === "multi_select" && (
         <div className="flex flex-wrap gap-2">
-          {db.classifier.options.map((opt) => {
-            const selected = multiSelectValue.includes(opt);
+          {DATABASES.map((d) => {
+            const selected = d.key === dbKey;
             return (
               <button
-                key={opt}
+                key={d.key}
                 type="button"
-                onClick={() =>
-                  setMultiSelectValue((prev) =>
-                    prev.includes(opt)
-                      ? prev.filter((v) => v !== opt)
-                      : [...prev, opt],
-                  )
-                }
-                className={pillClass(selected)}
+                onClick={() => setDbKey(d.key)}
+                className={`h-[38px] px-3.5 rounded-full text-[13px] border inline-flex items-center whitespace-nowrap transition-colors duration-150 active:scale-[0.97] ${
+                  selected
+                    ? "bg-[#4F46E5] border-[#4F46E5] text-white font-semibold dark:bg-[#6360DE] dark:border-[#6360DE]"
+                    : "bg-transparent border-[#E3E2E0] text-[#1F1F1F] font-medium dark:border-[#373737] dark:text-[#D4D4D4]"
+                }`}
               >
-                {opt}
+                {d.name}
               </button>
             );
           })}
         </div>
-      )}
+      </div>
 
-      {toast?.kind === "error" && (
-        <div
-          role="alert"
-          onClick={() => setToast(null)}
-          className="rounded-lg px-3 py-2 text-sm bg-red-50 text-red-700 border border-red-200"
-        >
-          {toast.message}
+      {/* 分類チップ（選択中DBに依存） */}
+      {db.classifier && (
+        <div className="flex flex-col gap-[7px] pt-[15px]">
+          <div className="text-[11px] font-semibold tracking-[0.06em] text-[#787774] dark:text-[#9B9B9B]">
+            {db.classifier.type === "status" ? "ステータス" : "分類"}
+          </div>
+          <div className="flex flex-wrap gap-[7px]">
+            {db.classifier.options.map((opt) => {
+              const selected =
+                db.classifier!.type === "status"
+                  ? opt === statusValue
+                  : multiSelectValue.includes(opt);
+              const onClick =
+                db.classifier!.type === "status"
+                  ? () => setStatusValue(opt)
+                  : () =>
+                      setMultiSelectValue((prev) =>
+                        prev.includes(opt)
+                          ? prev.filter((v) => v !== opt)
+                          : [...prev, opt],
+                      );
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={onClick}
+                  className={`h-[30px] px-3 rounded-full text-[12.5px] border inline-flex items-center whitespace-nowrap transition-colors duration-150 active:scale-[0.96] ${
+                    selected
+                      ? "bg-[#1F1F1F] border-[#1F1F1F] text-white font-semibold dark:bg-[#EDEDEC] dark:border-[#EDEDEC] dark:text-[#191919]"
+                      : "bg-transparent border-[#E3E2E0] text-[#787774] font-medium dark:border-[#373737] dark:text-[#9B9B9B]"
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      <div className="relative w-full">
+      {/* エラーバナー */}
+      {phase === "error" && (
+        <div
+          role="alert"
+          onClick={revertToIdle}
+          className="mt-3 px-3 py-2.5 rounded-lg text-[12.5px] leading-relaxed bg-[#FDEBEC] border border-[#F3D5D3] text-[#C4554D] dark:bg-[rgba(235,87,87,0.12)] dark:border-[rgba(235,87,87,0.28)] dark:text-[#E16F6C]"
+        >
+          保存に失敗しました。入力内容は保持しています — もう一度お試しください。
+          {errDetail && (
+            <span className="block mt-1 text-[11px] opacity-70">
+              {errDetail}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* 入力欄（残り全高を使う） */}
+      <div className="flex-1 flex min-h-0 pt-3">
         <textarea
           ref={textareaRef}
           // eslint-disable-next-line jsx-a11y/no-autofocus
@@ -195,40 +215,33 @@ export default function Page() {
           value={task}
           onChange={(e) => {
             setTask(e.target.value);
-            if (toast) setToast(null);
+            if (phase !== "idle") revertToIdle();
           }}
-          onClick={() => {
-            if (toast?.kind === "success") setToast(null);
+          onFocus={() => {
+            if (phase === "saved") revertToIdle();
           }}
-          placeholder={
-            toast?.kind === "success" ? "" : "思いついたタスクを入力..."
-          }
-          rows={6}
-          className="w-full resize-y rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-200 text-base leading-relaxed"
+          placeholder="メモを書く…"
+          className="flex-1 min-h-0 resize-none rounded-xl border border-[#E3E2E0] px-3.5 py-3 text-base leading-[1.7] outline-none transition-colors duration-150 bg-white text-[#1F1F1F] focus:border-[#1F1F1F] dark:bg-[#191919] dark:text-[#D4D4D4] dark:border-[#373737] dark:focus:border-[#D4D4D4]"
         />
-        {toast?.kind === "success" && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="pointer-events-none absolute left-4 top-3 right-4 text-base text-emerald-700 font-medium"
-          >
-            {toast.message}
-          </div>
-        )}
       </div>
 
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={disabled}
-        className={`w-full min-h-[56px] rounded-xl text-base font-semibold transition ${
-          disabled
-            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-            : "bg-gray-900 text-white active:bg-gray-700"
-        }`}
-      >
-        {saving ? "保存中..." : "保存"}
-      </button>
+      {/* 保存ボタン（✓にモーフ） */}
+      <div className="pt-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={disabled}
+          className={`w-full h-[54px] rounded-xl text-[15px] font-semibold border-none transition-colors duration-150 ${
+            saved
+              ? "bg-[#448361] text-white dark:bg-[#3E8B5F] animate-[qmPop_0.3s_cubic-bezier(0.34,1.56,0.64,1)] cursor-default"
+              : canSave
+                ? "bg-[#4F46E5] text-white dark:bg-[#6360DE] active:scale-[0.985]"
+                : "bg-[#F1F1EF] text-[#B9B7B4] dark:bg-[#2C2C2C] dark:text-[#6E6E6E] cursor-default"
+          }`}
+        >
+          {saved ? `✓ ${savedDbName}に追加しました` : "保存する"}
+        </button>
+      </div>
     </main>
   );
 }

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { DATABASES, DESTINATIONS, getDb } from "@/lib/databases";
+import DestinationPicker, { useDestPrefs } from "./DestinationPicker";
 
 type Phase = "idle" | "saved" | "error";
 
@@ -25,6 +26,12 @@ export default function Page() {
   const revertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // プル更新
+  // 保存先ボタンの表示名・並び順（この端末に保存）
+  const destPrefs = useDestPrefs();
+  const [editingDests, setEditingDests] = useState(false);
+  const editingRef = useRef(false);
+  editingRef.current = editingDests;
+
   const mainRef = useRef<HTMLElement>(null);
   const [pull, setPull] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -45,7 +52,8 @@ export default function Page() {
     let active = false;
 
     const onTouchStart = (e: TouchEvent) => {
-      if (refreshingRef.current) return;
+      // 並べ替え中はプル更新を止める
+      if (refreshingRef.current || editingRef.current) return;
       startY = e.touches[0].clientY;
       // textarea内部がスクロール済みのときは通常スクロールを優先
       const ta = textareaRef.current;
@@ -133,7 +141,7 @@ export default function Page() {
     setTask("");
     setDestKey(DESTINATIONS[0].key);
     setMultiSelectValue([]);
-    setSavedDbName(submittedDest.label);
+    setSavedDbName(destPrefs.labelOf(submittedDest.key));
     setPhase("saved");
     textareaRef.current?.focus();
 
@@ -259,31 +267,14 @@ export default function Page() {
         </h1>
       </header>
 
-      {/* 保存先タブ */}
-      <div className="flex flex-col gap-[7px]">
-        <div className="text-[11px] font-semibold tracking-[0.06em] text-[#787774] dark:text-[#9B9B9B]">
-          保存先
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {DESTINATIONS.map((d) => {
-            const selected = d.key === destKey;
-            return (
-              <button
-                key={d.key}
-                type="button"
-                onClick={() => setDestKey(d.key)}
-                className={`h-[38px] px-3.5 rounded-full text-[13px] border inline-flex items-center whitespace-nowrap transition-colors duration-150 active:scale-[0.97] ${
-                  selected
-                    ? "bg-[#4F46E5] border-[#4F46E5] text-white font-semibold dark:bg-[#6360DE] dark:border-[#6360DE]"
-                    : "bg-transparent border-[#E3E2E0] text-[#1F1F1F] font-medium dark:border-[#373737] dark:text-[#D4D4D4]"
-                }`}
-              >
-                {d.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* 保存先ボタン（編集モードで名前変更・並べ替え） */}
+      <DestinationPicker
+        selectedKey={destKey}
+        onSelect={setDestKey}
+        editing={editingDests}
+        onEditingChange={setEditingDests}
+        prefsApi={destPrefs}
+      />
 
       {/* タグ（マルチセレクトを持つ保存先のときだけ） */}
       {db?.classifier?.type === "multi_select" && (

@@ -34,8 +34,11 @@ const DEFAULT_PREFS: DestPrefs = {
 const CHIP_H = 38;
 const GAP = 8;
 const SNAP = 4;
-// 編集中は下に空きを作り、今より下の段にも置けるようにする
-const EDIT_EXTRA_H = CHIP_H + GAP * 2;
+// 縦は段（行）単位で揃える。横は自由
+const ROW = CHIP_H + GAP;
+const snapRow = (y: number) => Math.max(0, Math.round(y / ROW) * ROW);
+// 編集中は下に1段分の空きを作り、今より下の段にも置けるようにする
+const EDIT_EXTRA_H = ROW;
 
 // 保存済みの設定を現在の保存先一覧と突き合わせる（消えたキーは捨て、新しいキーは末尾へ）
 function normalize(prefs: DestPrefs): DestPrefs {
@@ -50,14 +53,15 @@ function normalize(prefs: DestPrefs): DestPrefs {
   if (prefs.positions) {
     positions = {};
     for (const [k, p] of Object.entries(prefs.positions)) {
-      if (known.has(k)) positions[k] = p;
+      // 以前の保存で段の途中にあるものも、一番近い段に揃える
+      if (known.has(k)) positions[k] = { x: p.x, y: snapRow(p.y) };
     }
     // 座標を持たない新しい保存先は、一番下の段に1つずつ置く
-    let bottom = Math.max(0, ...Object.values(positions).map((p) => p.y + CHIP_H + GAP));
+    let bottom = Math.max(0, ...Object.values(positions).map((p) => p.y + ROW));
     for (const k of order) {
       if (!positions[k]) {
         positions[k] = { x: 0, y: bottom };
-        bottom += CHIP_H + GAP;
+        bottom += ROW;
       }
     }
   }
@@ -267,7 +271,8 @@ export default function DestinationPicker({
     const w = chipRefs.current[key]?.offsetWidth ?? 0;
     const snap = (v: number) => Math.round(v / SNAP) * SNAP;
     const x = Math.min(Math.max(0, snap(cur.x + e.delta.x)), Math.max(0, containerWidth - w));
-    const y = Math.min(Math.max(0, snap(cur.y + e.delta.y)), areaHeight - CHIP_H);
+    const lastRowY = Math.floor((areaHeight - CHIP_H) / ROW) * ROW;
+    const y = Math.min(snapRow(cur.y + e.delta.y), lastRowY);
 
     // 他のボタンに重なる場所なら元の位置に戻す
     const hits = Object.entries(positions).some(([k, p]) => {

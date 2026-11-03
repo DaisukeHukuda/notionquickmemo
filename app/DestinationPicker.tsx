@@ -85,12 +85,14 @@ const chipIdle =
 function SortableChip({
   id,
   label,
+  selected,
   renaming,
   onTap,
   onCommit,
 }: {
   id: string;
   label: string;
+  selected: boolean;
   renaming: boolean;
   onTap: () => void;
   onCommit: (value: string) => void;
@@ -136,13 +138,11 @@ function SortableChip({
       onClick={onTap}
       {...attributes}
       {...listeners}
-      className={`${chipBase} ${chipIdle} border-dashed touch-none select-none ${
-        isDragging ? "shadow-md scale-105 bg-white dark:bg-[#252525]" : ""
+      // 通常時と同じ幅・同じ選択色にして、編集前後で並びがずれないようにする
+      className={`${chipBase} ${selected ? chipSelected : chipIdle} border-dashed touch-none select-none ${
+        isDragging ? "shadow-md opacity-90" : ""
       }`}
     >
-      <span className="mr-1.5 text-[#B9B7B4] dark:text-[#6E6E6E]" aria-hidden>
-        ⋮⋮
-      </span>
       {label}
     </button>
   );
@@ -246,6 +246,7 @@ export default function DestinationPicker({
                     key={key}
                     id={key}
                     label={labelOf(key)}
+                    selected={key === selectedKey}
                     renaming={renamingKey === key}
                     onTap={() => setRenamingKey(key)}
                     onCommit={(v) => commitLabel(key, v)}

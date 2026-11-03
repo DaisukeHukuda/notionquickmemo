@@ -1,11 +1,12 @@
 import { Client } from "@notionhq/client";
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/databases";
+import { getDb, getPage } from "@/lib/databases";
 
 export const runtime = "nodejs";
 
 type MemoBody = {
   dbKey?: unknown;
+  pageKey?: unknown;
   task?: unknown;
   classifier?: unknown;
 };
@@ -16,12 +17,6 @@ export async function POST(request: Request) {
     body = (await request.json()) as MemoBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const dbKey = typeof body.dbKey === "string" ? body.dbKey : "";
-  const db = getDb(dbKey);
-  if (!db) {
-    return NextResponse.json({ error: "Unknown dbKey" }, { status: 400 });
   }
 
   const task = typeof body.task === "string" ? body.task.trim() : "";
@@ -37,17 +32,49 @@ export async function POST(request: Request) {
     );
   }
 
-  // Build properties starting with the title field.
   // 末尾の「（Q）」はこのアプリ経由で追加された印。
   // 手入力で（Q）/(Q)が既に付いている場合は二重にならないよう剥がしてから付け直す。
   const baseTask = task.replace(/\s*[（(]Q[)）]$/, "").trimEnd() || task;
+  const richText = [
+    { text: { content: baseTask } },
+    { text: { content: "（Q）" }, annotations: { bold: true } },
+  ];
+
+  const notion = new Client({ auth: token });
+
+  // ページ宛て: 末尾にチェックボックスで追記
+  if (typeof body.pageKey === "string") {
+    const page = getPage(body.pageKey);
+    if (!page) {
+      return NextResponse.json({ error: "Unknown pageKey" }, { status: 400 });
+    }
+    try {
+      await notion.blocks.children.append({
+        block_id: page.pageId,
+        children: [
+          {
+            object: "block",
+            type: "to_do",
+            to_do: { rich_text: richText, checked: false },
+          },
+        ],
+      });
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Notion APIへの送信に失敗しました";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
+  const dbKey = typeof body.dbKey === "string" ? body.dbKey : "";
+  const db = getDb(dbKey);
+  if (!db) {
+    return NextResponse.json({ error: "Unknown dbKey" }, { status: 400 });
+  }
+
   const properties: Record<string, unknown> = {
-    [db.titleProp]: {
-      title: [
-        { text: { content: baseTask } },
-        { text: { content: "（Q）" }, annotations: { bold: true } },
-      ],
-    },
+    [db.titleProp]: { title: richText },
   };
 
   // Add classifier-specific property if the DB has one.
@@ -79,8 +106,6 @@ export async function POST(request: Request) {
       multi_select: value.map((name: string) => ({ name })),
     };
   }
-
-  const notion = new Client({ auth: token });
 
   try {
     await notion.pages.create({

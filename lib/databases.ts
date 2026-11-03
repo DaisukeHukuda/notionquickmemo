@@ -64,18 +64,38 @@ export function getDb(key: string): DbConfig | undefined {
   return DATABASES.find((d) => d.key === key);
 }
 
+// 末尾にチェックボックスで追記する先のページ。
+export type PageConfig = {
+  key: string;
+  name: string;
+  pageId: string;
+};
+
+export const PAGES: readonly PageConfig[] = [
+  { key: "iwasaki", name: "作業メモ：岩崎くん", pageId: "a021f6f636f5438e9aed73576fa22316" },
+  { key: "hoshino", name: "作業メモ：星野さん", pageId: "230afda7dd14447da49f15b93ea46f17" },
+];
+
+export function getPage(key: string): PageConfig | undefined {
+  return PAGES.find((p) => p.key === key);
+}
+
 // 画面に並ぶ保存先ボタン。TrayはGTD種別を固定値で書き込む。
+// dbKeyかpageKeyのどちらか一方を持つ。
 export type Destination = {
   key: string;
   label: string;
-  dbKey: string;
+  dbKey?: string;
   status?: string;
+  pageKey?: string;
 };
 
 export const DESTINATIONS: readonly Destination[] = [
   { key: "inbox", label: "Inbox", dbKey: "tray", status: "Inbox" },
   { key: "next", label: "次に取る行動", dbKey: "tray", status: "次に取る行動" },
   { key: "today", label: "Today's 進行中", dbKey: "tray", status: "Today's 進行中" },
+  { key: "iwasaki", label: "岩崎くんToDo", pageKey: "iwasaki" },
+  { key: "hoshino", label: "星野さんToDo", pageKey: "hoshino" },
   { key: "jojo_thoughts", label: "じょじょを考えたこと", dbKey: "jojo_thoughts" },
   { key: "jojo_places", label: "じょじょと行きたい場所リスト", dbKey: "jojo_places" },
 ];

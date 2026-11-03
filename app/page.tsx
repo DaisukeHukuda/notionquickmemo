@@ -33,7 +33,8 @@ export default function Page() {
   const refreshingRef = useRef(false);
 
   const dest = DESTINATIONS.find((d) => d.key === destKey) ?? DESTINATIONS[0];
-  const db = getDb(dest.dbKey) ?? DATABASES[0];
+  // ページ宛ての保存先はDBを持たない
+  const db = dest.dbKey ? getDb(dest.dbKey) ?? DATABASES[0] : null;
 
   useEffect(() => {
     const el = mainRef.current;
@@ -122,9 +123,9 @@ export default function Page() {
     const submittedMulti = multiSelectValue;
 
     let classifierPayload: string | string[] | undefined;
-    if (submittedDb.classifier?.type === "status") {
+    if (submittedDb?.classifier?.type === "status") {
       classifierPayload = submittedDest.status ?? submittedDb.classifier.default;
-    } else if (submittedDb.classifier?.type === "multi_select") {
+    } else if (submittedDb?.classifier?.type === "multi_select") {
       classifierPayload = submittedMulti;
     }
 
@@ -146,7 +147,8 @@ export default function Page() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          dbKey: submittedDb.key,
+          dbKey: submittedDb?.key,
+          pageKey: submittedDest.pageKey,
           task: submittedTask,
           classifier: classifierPayload,
         }),
@@ -284,7 +286,7 @@ export default function Page() {
       </div>
 
       {/* タグ（マルチセレクトを持つ保存先のときだけ） */}
-      {db.classifier?.type === "multi_select" && (
+      {db?.classifier?.type === "multi_select" && (
         <div className="flex flex-col gap-[7px] pt-[15px]">
           <div className="text-[11px] font-semibold tracking-[0.06em] text-[#787774] dark:text-[#9B9B9B]">
             分類

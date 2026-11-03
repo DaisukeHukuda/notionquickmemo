@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { DATABASES, getDb } from "@/lib/databases";
+import { DATABASES, DESTINATIONS, getDb } from "@/lib/databases";
 
 type Phase = "idle" | "saved" | "error";
 
@@ -15,12 +15,8 @@ const PULL_DAMPING = 0.4;
 const PULL_START_SLACK = 8;
 
 export default function Page() {
-  const [dbKey, setDbKey] = useState<string>(DATABASES[0].key);
+  const [destKey, setDestKey] = useState<string>(DESTINATIONS[0].key);
   const [task, setTask] = useState("");
-  const [statusValue, setStatusValue] = useState<string>(() => {
-    const c = DATABASES[0].classifier;
-    return c?.type === "status" ? c.default : "";
-  });
   const [multiSelectValue, setMultiSelectValue] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
   const [savedDbName, setSavedDbName] = useState("");
@@ -36,7 +32,8 @@ export default function Page() {
   const pullRef = useRef(0);
   const refreshingRef = useRef(false);
 
-  const db = getDb(dbKey) ?? DATABASES[0];
+  const dest = DESTINATIONS.find((d) => d.key === destKey) ?? DESTINATIONS[0];
+  const db = getDb(dest.dbKey) ?? DATABASES[0];
 
   useEffect(() => {
     const el = mainRef.current;
@@ -105,15 +102,10 @@ export default function Page() {
     };
   }, []);
 
-  // DB切替時は分類の選択状態をそのDBのデフォルトへ戻す
+  // 保存先を切り替えたらタグ選択はリセット
   useEffect(() => {
-    if (db.classifier?.type === "status") {
-      setStatusValue(db.classifier.default);
-    } else {
-      setStatusValue("");
-    }
     setMultiSelectValue([]);
-  }, [db]);
+  }, [destKey]);
 
   const revertToIdle = () => {
     if (revertTimerRef.current) clearTimeout(revertTimerRef.current);
@@ -125,24 +117,22 @@ export default function Page() {
     if (!trimmed || phase === "saved") return;
 
     const submittedTask = trimmed;
+    const submittedDest = dest;
     const submittedDb = db;
-    const submittedStatus = statusValue;
     const submittedMulti = multiSelectValue;
 
     let classifierPayload: string | string[] | undefined;
     if (submittedDb.classifier?.type === "status") {
-      classifierPayload = submittedStatus || submittedDb.classifier.default;
+      classifierPayload = submittedDest.status ?? submittedDb.classifier.default;
     } else if (submittedDb.classifier?.type === "multi_select") {
       classifierPayload = submittedMulti;
     }
 
-    // 楽観的UI: 押した瞬間に入力をリセットし、ボタンを✓表示にモーフ
+    // 楽観的UI: 押した瞬間に入力をリセットし、保存先はInboxへ戻す
     setTask("");
-    if (submittedDb.classifier?.type === "status") {
-      setStatusValue(submittedDb.classifier.default);
-    }
+    setDestKey(DESTINATIONS[0].key);
     setMultiSelectValue([]);
-    setSavedDbName(submittedDb.name);
+    setSavedDbName(submittedDest.label);
     setPhase("saved");
     textareaRef.current?.focus();
 
@@ -169,10 +159,9 @@ export default function Page() {
     } catch (err) {
       if (revertTimerRef.current) clearTimeout(revertTimerRef.current);
       setTask(submittedTask);
-      if (submittedDb.classifier?.type === "status") {
-        setStatusValue(submittedStatus);
-      }
-      setMultiSelectValue(submittedMulti);
+      setDestKey(submittedDest.key);
+      // destKey変更のeffectがタグを消すので、次のtickで復元する
+      setTimeout(() => setMultiSelectValue(submittedMulti), 0);
       setErrDetail(err instanceof Error ? err.message : "");
       setPhase("error");
     }
@@ -274,47 +263,41 @@ export default function Page() {
           保存先
         </div>
         <div className="flex flex-wrap gap-2">
-          {DATABASES.map((d) => {
-            const selected = d.key === dbKey;
+          {DESTINATIONS.map((d) => {
+            const selected = d.key === destKey;
             return (
               <button
                 key={d.key}
                 type="button"
-                onClick={() => setDbKey(d.key)}
+                onClick={() => setDestKey(d.key)}
                 className={`h-[38px] px-3.5 rounded-full text-[13px] border inline-flex items-center whitespace-nowrap transition-colors duration-150 active:scale-[0.97] ${
                   selected
                     ? "bg-[#4F46E5] border-[#4F46E5] text-white font-semibold dark:bg-[#6360DE] dark:border-[#6360DE]"
                     : "bg-transparent border-[#E3E2E0] text-[#1F1F1F] font-medium dark:border-[#373737] dark:text-[#D4D4D4]"
                 }`}
               >
-                {d.name}
+                {d.label}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 分類チップ（選択中DBに依存） */}
-      {db.classifier && (
+      {/* タグ（マルチセレクトを持つ保存先のときだけ） */}
+      {db.classifier?.type === "multi_select" && (
         <div className="flex flex-col gap-[7px] pt-[15px]">
           <div className="text-[11px] font-semibold tracking-[0.06em] text-[#787774] dark:text-[#9B9B9B]">
-            {db.classifier.type === "status" ? "ステータス" : "分類"}
+            分類
           </div>
           <div className="flex flex-wrap gap-[7px]">
             {db.classifier.options.map((opt) => {
-              const selected =
-                db.classifier!.type === "status"
-                  ? opt === statusValue
-                  : multiSelectValue.includes(opt);
-              const onClick =
-                db.classifier!.type === "status"
-                  ? () => setStatusValue(opt)
-                  : () =>
-                      setMultiSelectValue((prev) =>
-                        prev.includes(opt)
-                          ? prev.filter((v) => v !== opt)
-                          : [...prev, opt],
-                      );
+              const selected = multiSelectValue.includes(opt);
+              const onClick = () =>
+                setMultiSelectValue((prev) =>
+                  prev.includes(opt)
+                    ? prev.filter((v) => v !== opt)
+                    : [...prev, opt],
+                );
               return (
                 <button
                   key={opt}

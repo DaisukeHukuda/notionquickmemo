@@ -14,8 +14,19 @@ const PULL_MAX = 90;
 const PULL_DAMPING = 0.4;
 const PULL_START_SLACK = 8;
 
+// 前回選んだ保存先をこの端末に記憶する
+const DEST_STORAGE_KEY = "qm.destKey";
+
+function chipClass(selected: boolean) {
+  return selected
+    ? "bg-[#4F46E5] border-[#4F46E5] text-white font-semibold dark:bg-[#6360DE] dark:border-[#6360DE]"
+    : "bg-transparent border-[#E3E2E0] text-[#1F1F1F] font-medium dark:border-[#373737] dark:text-[#D4D4D4]";
+}
+
 export default function Page() {
   const [destKey, setDestKey] = useState<string>(DESTINATIONS[0].key);
+  // 復元が終わるまで選択色を出さない（Inboxが一瞬光るのを防ぐ）
+  const [restored, setRestored] = useState(false);
   const [task, setTask] = useState("");
   const [multiSelectValue, setMultiSelectValue] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -103,6 +114,22 @@ export default function Page() {
     };
   }, []);
 
+  // 起動時に前回の保存先を復元
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DEST_STORAGE_KEY);
+      if (saved && DESTINATIONS.some((d) => d.key === saved)) setDestKey(saved);
+    } catch {}
+    setRestored(true);
+  }, []);
+
+  const selectDest = (key: string) => {
+    setDestKey(key);
+    try {
+      localStorage.setItem(DEST_STORAGE_KEY, key);
+    } catch {}
+  };
+
   // 保存先を切り替えたらタグ選択はリセット
   useEffect(() => {
     setMultiSelectValue([]);
@@ -129,9 +156,8 @@ export default function Page() {
       classifierPayload = submittedMulti;
     }
 
-    // 楽観的UI: 押した瞬間に入力をリセットし、保存先はInboxへ戻す
+    // 楽観的UI: 押した瞬間に入力をリセット（保存先はそのまま）
     setTask("");
-    setDestKey(DESTINATIONS[0].key);
     setMultiSelectValue([]);
     setSavedDbName(submittedDest.label);
     setPhase("saved");
@@ -264,24 +290,28 @@ export default function Page() {
         <div className="text-[11px] font-semibold tracking-[0.06em] text-[#787774] dark:text-[#9B9B9B]">
           保存先
         </div>
-        <div className="flex flex-wrap gap-2">
-          {DESTINATIONS.map((d) => {
-            const selected = d.key === destKey;
-            return (
-              <button
-                key={d.key}
-                type="button"
-                onClick={() => setDestKey(d.key)}
-                className={`h-[38px] px-3.5 rounded-full text-[13px] border inline-flex items-center whitespace-nowrap transition-colors duration-150 active:scale-[0.97] ${
-                  selected
-                    ? "bg-[#4F46E5] border-[#4F46E5] text-white font-semibold dark:bg-[#6360DE] dark:border-[#6360DE]"
-                    : "bg-transparent border-[#E3E2E0] text-[#1F1F1F] font-medium dark:border-[#373737] dark:text-[#D4D4D4]"
-                }`}
-              >
-                {d.label}
-              </button>
-            );
-          })}
+        {/* 先頭（Inbox）は大きく1段、残りは6等分で1段 */}
+        {DESTINATIONS.slice(0, 1).map((d) => (
+          <button
+            key={d.key}
+            type="button"
+            onClick={() => selectDest(d.key)}
+            className={`h-[44px] w-full rounded-full text-[14px] border transition-colors duration-150 active:scale-[0.985] ${chipClass(restored && d.key === destKey)}`}
+          >
+            {d.label}
+          </button>
+        ))}
+        <div className="grid grid-cols-6 gap-1">
+          {DESTINATIONS.slice(1).map((d) => (
+            <button
+              key={d.key}
+              type="button"
+              onClick={() => selectDest(d.key)}
+              className={`h-[38px] px-0 rounded-full text-[12px] tracking-[-0.02em] border whitespace-nowrap transition-colors duration-150 active:scale-[0.95] ${chipClass(restored && d.key === destKey)}`}
+            >
+              {d.label}
+            </button>
+          ))}
         </div>
       </div>
 

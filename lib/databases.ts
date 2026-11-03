@@ -92,10 +92,10 @@ export type Destination = {
 
 export const DESTINATIONS: readonly Destination[] = [
   { key: "inbox", label: "Inbox", dbKey: "tray", status: "Inbox" },
-  { key: "next", label: "次に取る行動", dbKey: "tray", status: "次に取る行動" },
-  { key: "today", label: "Today's 進行中", dbKey: "tray", status: "Today's 進行中" },
-  { key: "iwasaki", label: "岩崎くんToDo", pageKey: "iwasaki" },
-  { key: "hoshino", label: "星野さんToDo", pageKey: "hoshino" },
-  { key: "jojo_thoughts", label: "じょじょを考えたこと", dbKey: "jojo_thoughts" },
-  { key: "jojo_places", label: "じょじょと行きたい場所リスト", dbKey: "jojo_places" },
+  { key: "next", label: "次に取る", dbKey: "tray", status: "次に取る行動" },
+  { key: "today", label: "Today's", dbKey: "tray", status: "Today's 進行中" },
+  { key: "iwasaki", label: "岩崎", pageKey: "iwasaki" },
+  { key: "hoshino", label: "星野", pageKey: "hoshino" },
+  { key: "jojo_thoughts", label: "J考え", dbKey: "jojo_thoughts" },
+  { key: "jojo_places", label: "J場所", dbKey: "jojo_places" },
 ];

@@ -43,6 +43,26 @@ export default function Page() {
   const pullRef = useRef(0);
   const refreshingRef = useRef(false);
 
+  // キーボード表示中は「見えている範囲」に画面を合わせ、保存ボタンをキーボードの真上に置く
+  const [viewport, setViewport] = useState<{ top: number; height: number; keyboard: boolean } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () =>
+      setViewport({
+        top: vv.offsetTop,
+        height: vv.height,
+        keyboard: window.innerHeight - vv.height > 120,
+      });
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
   const dest = DESTINATIONS.find((d) => d.key === destKey) ?? DESTINATIONS[0];
   // ページ宛ての保存先はDBを持たない
   const db = dest.dbKey ? getDb(dest.dbKey) ?? DATABASES[0] : null;
@@ -204,7 +224,12 @@ export default function Page() {
   return (
     <main
       ref={mainRef}
-      className="relative overflow-hidden h-dvh w-full max-w-xl mx-auto box-border"
+      className="fixed inset-x-0 top-0 overflow-hidden h-dvh w-full max-w-xl mx-auto box-border"
+      style={
+        viewport
+          ? { top: viewport.top, height: viewport.height }
+          : undefined
+      }
     >
       {/* プル更新インジケーター */}
       <div
@@ -264,7 +289,10 @@ export default function Page() {
       </div>
 
       <div
-        className="h-full flex flex-col px-5 pt-3 pb-[max(10px,env(safe-area-inset-bottom))] box-border"
+        className={`h-full flex flex-col px-5 pt-3 box-border ${
+          // キーボード表示中は下の余白（ホームバー分）が不要
+          viewport?.keyboard ? "pb-2" : "pb-[max(10px,env(safe-area-inset-bottom))]"
+        }`}
         style={{
           transform: `translateY(${pull}px)`,
           transition: dragging ? "none" : "transform 0.2s ease",
